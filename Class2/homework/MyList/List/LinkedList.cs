@@ -348,7 +348,6 @@ namespace List
         {
             private bool _listChanged = false;
             private Node _curNode { get; set; }
-            private int _curIndex { get; set; }
             readonly private LinkedList<T> _linkedList;
             private void _OnChanged(object sender, EventArgs e)
             {
@@ -366,7 +365,6 @@ namespace List
 
                 // Sets the enumerator to its initial position,
                 // which is before the first element in the collection.
-                _curIndex = -1;
                 _curNode = _linkedList.Head;
             }
             public bool MoveNext()
