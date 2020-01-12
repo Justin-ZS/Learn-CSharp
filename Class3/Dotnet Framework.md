@@ -2,6 +2,7 @@
 ## Reading Resource
 1. [Get started with the .NET Framework](https://docs.microsoft.com/en-us/dotnet/framework/get-started/index#Introducing)
 1. [Framework Design Guidelines](https://docs.microsoft.com/en-us/dotnet/standard/design-guidelines/index)
+1. [Assemblies in .NET](https://docs.microsoft.com/en-us/dotnet/standard/assembly/)
 1. [Reflection in .NET](https://docs.microsoft.com/en-us/dotnet/framework/reflection-and-codedom/reflection)
 1. [Assembly Class](https://docs.microsoft.com/en-us/dotnet/api/system.reflection.assembly?view=netframework-4.8)
 
