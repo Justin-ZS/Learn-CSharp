@@ -1,11 +1,32 @@
-﻿using System;
+﻿// 写一个程序，把一个 `Assembly` 中的所有类型用一个 `TreeView` 展现出来，并且按照 `Namespace` 分层。(基本的结果和 `Reflector` 功能类似)
+
+// * 具体要求
+//   1. 使用代码规范。
+//   2. `Assembly` 为任意指定的一个.NET Assembly
+//   3. 使用 `Namespace` 分层
+//   4. 区分 `Method.Property.Event` 和构造函数（构造函数节点名为`.ctor`）
+
+// * 注意事项
+//   1. 函数参数检查，并合理使用 `Exception`
+//   3. 不显示所有从父类派生得到的 `Method.Property` 和 `Event`
+//   4. 如果 `Member` 有 `Attribute0`，请显示出来
+
+// * 考查目的：
+//   1. C#基本语法。
+//   2. 常用的类库。
+//   3. `WinForm / WPF`
+//   4. `Reflection`
+//   5. 代码规范。
+//   6. OOP方面: 正确抽象 ,数据和显示分离
+
+using System;
 using System.Reflection;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
 // The key organizational concepts in C# are programs, namespaces, types, members, and assemblies.
-// Types:
-//  Classes -> DisplayType
+// Types: -> DisplayType
+//  Classes
 //  Interfaces
 //  Structs
 //  Enumerations
@@ -25,7 +46,7 @@ namespace AssemblyView
 {
     class Program
     {
-        static string GetVisibility(MethodInfo m)
+        public static string GetVisibility(MethodInfo m)
         {
             string visibility = "";
             if (m.IsPublic) return "Public";
@@ -35,20 +56,37 @@ namespace AssemblyView
             else if (m.IsAssembly) visibility += "Assembly";
             return visibility;
         }
-        public static void DisplayAttributes(Int32 indent, MemberInfo mi)
+        public static string GetTypeName(Type type)
         {
-            // Get the set of custom attributes; if none exist, just return.
-            object[] attrs = mi.GetCustomAttributes(false);
-            if (attrs.Length == 0) { return; }
-
-            // Display the custom attributes applied to this member.
-            Display(indent + 1, "Attributes:");
-            foreach (object o in attrs)
-            {
-                Display(indent + 2, "{0}", o.ToString());
-            }
+            var typeName = "Type";
+            if (type.IsClass) typeName = "Class";
+            if (type.IsInterface) typeName = "Interface";
+            if (type.IsEnum) typeName = "Enum";
+            return typeName;
         }
-        
+        public static BindingFlags GetMemberFlags(Type type)
+        {
+            var flags = BindingFlags.Instance
+                | BindingFlags.Static
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.DeclaredOnly; // no-inherit
+            // https://stackoverflow.com/questions/10081668/what-is-value-defined-in-enum-in-c-sharp
+            if (type.IsEnum) flags = BindingFlags.Public | BindingFlags.Static;
+            return flags;
+        }
+        public static bool isCompilerGenerated(MemberInfo info)
+        {
+            return info.GetCustomAttributes(typeof(CompilerGeneratedAttribute), false).Any();
+        }
+        public static void DisplayAttributes(int indent, MemberInfo info)
+        {
+            object[] attrs = info.GetCustomAttributes(false);
+            if (attrs.Length == 0) return;
+
+            Display(indent, "Attributes:");
+            attrs.ToList().ForEach(att => Display(indent + 1, "{0}", att.ToString()));
+        }
         public static void DisplayMethodSignature(int indent, MethodInfo method)
         {
             var argTypes = method.GetParameters().Select(info => info.ParameterType.Name);
@@ -56,10 +94,7 @@ namespace AssemblyView
         }
         public static void DisplayMethod(int indent, MethodInfo method)
         {
-            if (method.IsSpecialName)
-            {
-                return;
-            }
+            if (method.IsSpecialName) return;
             Display(indent, "Method: {0}", method.Name);
             DisplayMethodSignature(indent + 1, method);
         }
@@ -85,51 +120,45 @@ namespace AssemblyView
         {
             Display(indent, "Event: {0}", ev.Name);
         }
-        public static void DisplayMember(int indent, MemberInfo obj)
+        public static void DisplayMember(int indent, MemberInfo info)
         {
-            var isGenerated = obj.GetCustomAttributes(typeof(CompilerGeneratedAttribute), false).Any();
-            if (isGenerated)
-            {
-                return;
-            }
+            if (isCompilerGenerated(info)) return;
 
-            switch (obj.MemberType)
+            switch (info.MemberType)
             {
                 case MemberTypes.NestedType:
-                    DisplayType(indent, obj as Type);
+                    DisplayType(indent, info as Type);
                     break;
                 case MemberTypes.Event:
-                    DisplayEvent(indent, obj as EventInfo);
+                    DisplayEvent(indent, info as EventInfo);
                     break;
                 case MemberTypes.Field:
-                    DisplayField(indent, obj as FieldInfo);
+                    DisplayField(indent, info as FieldInfo);
                     break;
                 case MemberTypes.Constructor:
-                    DisplayConstructor(indent, obj as ConstructorInfo);
+                    DisplayConstructor(indent, info as ConstructorInfo);
                     break;
                 case MemberTypes.Property:
-                    DisplayProperty(indent, obj as PropertyInfo);
+                    DisplayProperty(indent, info as PropertyInfo);
                     break;
                 case MemberTypes.Method:
-                    DisplayMethod(indent, obj as MethodInfo);
+                    DisplayMethod(indent, info as MethodInfo);
                     break;
                 default:
-                    Display(indent, "Member: {0}", obj.Name);
+                    Display(indent, "Member: {0}", info.Name);
                     break;
             }
+            DisplayAttributes(indent + 1, info);
         }
-        public static void DisplayType(int indent, Type obj)
+        public static void DisplayType(int indent, Type type)
         {
-            Display(indent, "\nType: {0}", obj.Name);
+            if (isCompilerGenerated(type as MemberInfo) || type.IsSpecialName) return;
 
-            var allTypes =  BindingFlags.Instance
-                | BindingFlags.Static
-                | BindingFlags.Public
-                | BindingFlags.NonPublic
-                | BindingFlags.DeclaredOnly; // no-inherit
-            var memberInfos = obj.GetMembers(allTypes);
+            Console.WriteLine();
+            Display(indent, "{0}: {1}", GetTypeName(type), type.Name);
+
+            var memberInfos = type.GetMembers(GetMemberFlags(type));
             memberInfos.ToList().ForEach(mInfo => DisplayMember(indent + 1, mInfo));
-
         }
         public static void Display(int indent, string format, params object[] args)
 
@@ -143,28 +172,7 @@ namespace AssemblyView
             const string filePath = @"../../../Class2/homework/MyList/List/bin/Debug/netstandard2.0/List.dll";
             var listAssembly = Assembly.LoadFrom(filePath);
             Display(0, "Assembly: {0}", listAssembly.FullName);
-            // Console.WriteLine("\n Assembly Full Name:");
-            // Console.WriteLine(listAssembly.FullName);
-            // Console.WriteLine("\n Assembly CodeBase:");
-            // Console.WriteLine(listAssembly.CodeBase);
-            // Console.WriteLine("\n Assembly Types:");
-            // Console.Write($"{listAssembly.GetTypes().Count()}: ");
-            // Console.WriteLine(String.Join("  ", listAssembly.GetTypes().Select(t => t.Name).ToArray()));
-            // Console.WriteLine("\n NameSpace: ");
-            // Console.WriteLine(listAssembly.GetTypes()[0].Namespace);
-            // Console.WriteLine("\n ElementType: ");
-            // Console.WriteLine(listAssembly.GetTypes()[0].GetElementType());
-            // Console.WriteLine("\n List GetMembers: ");
-            // Console.WriteLine(String.Join("  ", listAssembly.GetTypes()[0].GetMembers().Select(c => c.Name)));
-            // Console.WriteLine("\n List GetConstructors: ");
-            // Console.WriteLine(String.Join("  ", listAssembly.GetTypes()[0].GetConstructors().Select(c => c.ToString())));
-            // Console.WriteLine("\n GetFields: ");
-            // Console.WriteLine(String.Join("  ", listAssembly.GetTypes()[0].GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Select(c => c.Name)));
-            // Console.WriteLine("\n List FullName: ");
-            // Console.WriteLine(listAssembly.GetTypes()[0].FullName);
-
-            Console.WriteLine("\nClass: ");
-            DisplayType(0, listAssembly.GetTypes()[0]);
+            listAssembly.GetTypes().ToList().ForEach(t => DisplayType(1, t));
         }
     }
 }
