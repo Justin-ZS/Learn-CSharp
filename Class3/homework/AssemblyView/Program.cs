@@ -44,6 +44,7 @@ using System.Runtime.CompilerServices;
 //  Indexers
 //  Operators
 //  Nested Types -> Recursive
+
 namespace AssemblyView
 {
     class Program
@@ -183,6 +184,24 @@ namespace AssemblyView
             Display(indent, "NameSpace: {0}", ns);
             types.ToList().ForEach(t => DisplayType(indent + 1, t));
         }
+        public static void DisplayAssembly(int indent, Assembly assembly)
+        {
+            Display(indent, "Assembly: {0}", assembly.FullName);
+            assembly
+                .GetTypes() // The returned array includes nested types.
+                .ToList()
+                .GroupBy( // groupBy NameSpace
+                    t => t.Namespace,
+                    t => t,
+                    (_, ts) => ts)
+                .ToList()
+                .ForEach(ts => DisplayNamespace(indent + 1, ts));
+        }
+        public static void DisplayAssemblyOOP(Assembly assembly)
+        {
+            var assemblyInfo = new AssemblyInfo(assembly);
+            assemblyInfo.DisplayInfo();
+        }
         public static Assembly LoadAssemblyFrom(string filePath)
         {
             try
@@ -202,7 +221,7 @@ namespace AssemblyView
                 Console.WriteLine("Please specify a valid assembly path!");
                 return 1;
             }
-            
+
             // Remember to build an assembly before run below code.
             // sample path: "../../../Class2/homework/MyList/List/bin/Debug/netstandard2.0/List.dll";
             var assembly = LoadAssemblyFrom(args[0]);
@@ -212,17 +231,16 @@ namespace AssemblyView
                 return 1;
             }
 
-            Display(0, "Assembly: {0}", assembly.FullName);
-            assembly
-                .GetTypes() // The returned array includes nested types.
-                .ToList()
-                .GroupBy( // groupBy NameSpace
-                    t => t.Namespace,
-                    t => t,
-                    (_, ts) => ts)
-                .ToList()
-                .ForEach(ts => DisplayNamespace(1, ts));
-
+            try
+            {
+                DisplayAssembly(0, assembly);
+                // DisplayAssemblyOOP(assembly);
+            }
+            catch
+            {
+                Console.WriteLine("Can't analysis specified assembly!");
+                return 1;
+            }
             return 0;
         }
     }
